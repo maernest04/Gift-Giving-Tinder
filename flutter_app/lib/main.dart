@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
 import 'theme.dart';
 import 'onboarding_page.dart';
 
-void main() {
+Future<void> main() async {
+  // Load environment variables before running the app
+  await dotenv.load(fileName: '.env');
   runApp(const GiftMatchApp());
 }
 
