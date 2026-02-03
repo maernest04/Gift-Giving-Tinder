@@ -99,23 +99,27 @@ class _LoginPageState extends State<LoginPage>
     } on CustomAuthException catch (e) {
       if (mounted) {
         setState(() {
-          switch (e.code) {
-            case 'user-not-found':
-            case 'invalid-email':
-            case 'email-already-in-use':
-              _emailError = e.message;
-              break;
-            case 'wrong-password':
-            case 'weak-password':
-              _passwordError = e.message;
-              break;
-            case 'invalid-credential':
-              // Could be either, but usually implies bad combo.
-              // Show on password or global.
-              _globalError = "Your email or password was incorrect";
-              break;
-            default:
-              _globalError = e.message;
+          // For sign-up mode, show all errors in the global card
+          if (!_isLogin) {
+            _globalError = e.message;
+          } else {
+            // For login mode, show field-specific errors
+            switch (e.code) {
+              case 'user-not-found':
+              case 'invalid-email':
+                _emailError = e.message;
+                break;
+              case 'wrong-password':
+                _passwordError = e.message;
+                break;
+              case 'invalid-credential':
+                // Could be either, but usually implies bad combo.
+                // Show on password or global.
+                _globalError = "Your email or password was incorrect";
+                break;
+              default:
+                _globalError = e.message;
+            }
           }
         });
       }
@@ -291,14 +295,40 @@ class _LoginPageState extends State<LoginPage>
                           if (_globalError != null)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 16.0),
-                              child: Text(
-                                _globalError!,
-                                style: const TextStyle(
-                                  color: Color(0xFFff4d6d),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFFff4d6d,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFFff4d6d,
+                                    ).withOpacity(0.3),
+                                    width: 1,
+                                  ),
                                 ),
-                                textAlign: TextAlign.center,
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.error_outline,
+                                      color: Color(0xFFff4d6d),
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        _globalError!,
+                                        style: const TextStyle(
+                                          color: Color(0xFFff4d6d),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
 

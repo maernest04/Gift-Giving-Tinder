@@ -19,7 +19,7 @@ class SwipePage extends StatelessWidget {
             child: Text(
               "You've seen all the gift ideas for now. Check back later!",
               style: AppTextStyles.body.copyWith(
-                color: AppColors.textSecondary,
+                color: AppColors.getSecondaryTextColor(),
               ),
               textAlign: TextAlign.center,
             ),

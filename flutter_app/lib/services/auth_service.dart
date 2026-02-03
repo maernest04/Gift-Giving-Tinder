@@ -108,6 +108,116 @@ class AuthService {
     }
   }
 
+  // Update Display Name
+  Future<void> updateDisplayName(String newName) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw CustomAuthException('no-user', 'No user is currently signed in');
+      }
+
+      await _db.collection('users').doc(user.uid).update({'name': newName});
+    } catch (e) {
+      throw CustomAuthException('unknown', 'Failed to update name: $e');
+    }
+  }
+
+  // Update Email
+  Future<void> updateEmail(
+    String newEmail,
+    String oldEmail,
+    String currentPassword,
+  ) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null || user.email == null) {
+        throw CustomAuthException('no-user', 'No user is currently signed in');
+      }
+
+      // Refresh user state to ensure we have the latest email (especially if verified recently)
+      await user.reload();
+      final freshUser = _auth.currentUser!;
+
+      // 1. Re-authenticate user with current password to satisfy security requirements
+      final credential = EmailAuthProvider.credential(
+        email: freshUser.email!,
+        password: currentPassword,
+      );
+
+      try {
+        await freshUser.reauthenticateWithCredential(credential);
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'invalid-credential' || e.code == 'wrong-password') {
+          throw CustomAuthException(
+            'wrong-password',
+            'The password you entered is incorrect.',
+          );
+        }
+        rethrow;
+      }
+
+      // 2. Send verification email to new address
+      await user.verifyBeforeUpdateEmail(newEmail);
+
+      // 3. Update email in Firestore
+      await _db.collection('users').doc(user.uid).update({'email': newEmail});
+
+      print('Verification email sent to $newEmail. Firestore updated.');
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      if (e.toString().contains('permission-denied')) {
+        throw CustomAuthException(
+          'permission-denied',
+          'You do not have permission to update this email address.',
+        );
+      }
+      throw CustomAuthException('unknown', 'Failed to update email: $e');
+    }
+  }
+
+  // Update Password
+  Future<void> updatePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null || user.email == null) {
+        throw CustomAuthException('no-user', 'No user is currently signed in');
+      }
+
+      // Refresh user state
+      await user.reload();
+      final freshUser = _auth.currentUser!;
+
+      // Re-authenticate user with current password
+      final credential = EmailAuthProvider.credential(
+        email: freshUser.email!,
+        password: currentPassword,
+      );
+
+      try {
+        await freshUser.reauthenticateWithCredential(credential);
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'invalid-credential' || e.code == 'wrong-password') {
+          throw CustomAuthException(
+            'wrong-password',
+            'The current password you entered is incorrect.',
+          );
+        }
+        rethrow;
+      }
+
+      // Update password
+      await freshUser.updatePassword(newPassword);
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      throw CustomAuthException('unknown', 'Failed to update password: $e');
+    }
+  }
+
   String _generatePartnerCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final rnd = Random();
@@ -136,6 +246,10 @@ class AuthService {
         break;
       case 'invalid-credential':
         message = 'Invalid email or password.';
+        break;
+      case 'requires-recent-login':
+        message =
+            'For security, please log out and log back in before changing your email.';
         break;
       default:
         message = e.message ?? 'Authentication failed';
