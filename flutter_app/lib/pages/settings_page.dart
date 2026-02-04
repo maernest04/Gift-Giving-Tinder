@@ -138,8 +138,8 @@ class _SettingsPageState extends State<SettingsPage>
           children: [
             // Modern Single Tab Bar
             AnimatedContainer(
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeInOut,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
               margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -163,8 +163,8 @@ class _SettingsPageState extends State<SettingsPage>
                     child: GestureDetector(
                       onTap: () => _onTabTap(index),
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 600),
-                        curve: Curves.easeInOut,
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
                           color: isSelected
