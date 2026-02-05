@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -124,8 +125,16 @@ class _SwipePageState extends State<SwipePage>
     final threshold = width * 0.3; // Swipe 30% of screen to confirm
 
     if (_dragOffset.dx > threshold) {
+      // Haptic feedback
+      if (themeService.hapticFeedback) {
+        HapticFeedback.mediumImpact();
+      }
       _animateOut(true); // Right / Like
     } else if (_dragOffset.dx < -threshold) {
+      // Haptic feedback
+      if (themeService.hapticFeedback) {
+        HapticFeedback.mediumImpact();
+      }
       _animateOut(false); // Left / Nope
     } else {
       // Snap back to center
@@ -142,6 +151,11 @@ class _SwipePageState extends State<SwipePage>
   /// Programmatic swipe (e.g. from buttons)
   void _triggerSwipe(bool isLiked) {
     if (_cards.isEmpty || _isAnimatingOut) return;
+
+    // Haptic feedback
+    if (themeService.hapticFeedback) {
+      HapticFeedback.mediumImpact();
+    }
 
     // Start slightly in the direction so it feels like a push
     _dragOffset = Offset(isLiked ? 20 : -20, 0);

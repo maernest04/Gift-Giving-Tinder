@@ -50,5 +50,10 @@ app.*.map.json
 # Android signing (do not commit key.properties or .jks)
 **/android/key.properties
 
+# Firebase config files (optional - these are client-side keys but you can exclude if preferred)
+# Uncomment these lines if you want to keep Firebase configs out of git:
+# android/app/google-services.json
+# ios/Runner/GoogleService-Info.plist
+
 # Flutter analyze output (optional, regenerate with: flutter analyze > analysis.txt)
 analysis.txt

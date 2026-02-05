@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
+import 'notification_service.dart';
 
 class CustomAuthException implements Exception {
   final String code;
@@ -280,11 +281,19 @@ class AuthService {
     });
     batch.delete(_db.collection('partner_requests').doc(requestDocId));
     await batch.commit();
+    
+    // Notify the requester that their request was accepted
+    final theirUser = await getUser(theirUid);
+    if (theirUser != null) {
+      notificationService.notifyRequestAccepted(theirUser.name);
+    }
   }
 
   /// Decline incoming request: delete the request doc.
   Future<void> declinePartnerRequest(String myUid, String theirUid, String requestDocId) async {
     await _db.collection('partner_requests').doc(requestDocId).delete();
+    // Notify the requester (optional - they'll see it's gone when they check)
+    notificationService.notifyRequestDeclined();
   }
 
   /// Cancel outgoing request: delete request doc and clear your pendingRequestToId.

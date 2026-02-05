@@ -1204,7 +1204,7 @@ class _SettingsPageState extends State<SettingsPage>
           if (title != null) const SizedBox(height: 16),
           if (scrollableChild != null)
             ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 320),
+              constraints: const BoxConstraints(maxHeight: 500),
               child: SingleChildScrollView(
                 child: scrollableChild,
               ),

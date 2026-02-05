@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,6 +9,7 @@ import 'onboarding_page.dart';
 import 'pages/home_page.dart';
 
 import 'services/theme_service.dart';
+import 'services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_page.dart';
 
@@ -60,7 +62,7 @@ class _GiftMatchAppState extends State<GiftMatchApp> {
     // Initialize Theme/Preferences from storage
     await themeService.init();
 
-    // Then initialize Firebase
+    // Initialize Firebase
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -74,6 +76,12 @@ class _GiftMatchAppState extends State<GiftMatchApp> {
       // Ignore timeout, we'll handle it in build
     }
 
+    // Initialize notifications (only if user is signed in)
+    try {
+      await notificationService.initialize();
+    } catch (e) {
+      debugPrint('Failed to initialize notifications: $e');
+    }
   }
 
   @override
