@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../theme.dart';
 import '../login_page.dart';
 import '../services/auth_service.dart';
@@ -37,11 +40,25 @@ class _SettingsPageState extends State<SettingsPage>
   String? _nameError;
   String? _emailError;
 
+  int _interestsRefreshKey = 0;
+
+  final ScrollController _settingsScrollController = ScrollController();
+  double _settingsScrollOffset = 0.0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadUserData();
+    _settingsScrollController.addListener(_onSettingsScroll);
+  }
+
+  void _onSettingsScroll() {
+    if (!mounted) return;
+    final offset = _settingsScrollController.offset;
+    if (offset != _settingsScrollOffset) {
+      setState(() => _settingsScrollOffset = offset);
+    }
   }
 
   @override
@@ -107,6 +124,8 @@ class _SettingsPageState extends State<SettingsPage>
   void dispose() {
     _nameController.removeListener(_onNameChanged);
     _emailController.removeListener(_onEmailChanged);
+    _settingsScrollController.removeListener(_onSettingsScroll);
+    _settingsScrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _nameController.dispose();
     _emailController.dispose();
@@ -118,7 +137,48 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   void _onTabTap(int index) {
-    setState(() => _currentTab = index);
+    setState(() {
+      _currentTab = index;
+      _settingsScrollOffset = 0.0; // New tab starts at top, no fade
+    });
+  }
+
+  Future<void> _removeLikedTitle(String userId, String title) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('userPreferences')
+          .doc(userId)
+          .update({
+        'likedTitles': FieldValue.arrayRemove([title]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) setState(() => _interestsRefreshKey++);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not remove. Try again.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeLikedTag(String userId, String tag) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('userPreferences')
+          .doc(userId)
+          .update({
+        'likedTags': FieldValue.arrayRemove([tag]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) setState(() => _interestsRefreshKey++);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not remove. Try again.')),
+        );
+      }
+    }
   }
 
   // Experience State - Now managed by themeService globally
@@ -246,13 +306,67 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildScrollableContent(Widget child, {Key? key}) {
-    return SingleChildScrollView(
-      key: key,
-      padding: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        child: child,
-      ),
+    final bottom = MediaQuery.of(context).padding.bottom;
+    final bgColor = themeService.isGlass
+        ? AppColors.bgLight
+        : AppColors.bgDark;
+    const fadeHeight = 28.0;
+
+    return Stack(
+      children: [
+        Container(
+          color: bgColor,
+          child: SingleChildScrollView(
+            key: key,
+            controller: _settingsScrollController,
+            padding: EdgeInsets.zero,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottom),
+              child: child,
+            ),
+          ),
+        ),
+        // Top fade: only visible when user has scrolled (so top cards stay clear)
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: fadeHeight,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 120),
+              opacity: (_settingsScrollOffset / fadeHeight).clamp(0.0, 1.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [bgColor, bgColor.withOpacity(0)],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Bottom fade: transparent → background color
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: fadeHeight,
+          child: IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [bgColor.withOpacity(0), bgColor],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -843,23 +957,262 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildInterestsTab() {
-    // Mock interests
-    return _buildSection(
-      title: "Your Interests",
-      children: [
-        const Text(
-          "You haven't swiped on anything yet.",
-          style: TextStyle(color: AppColors.textSecondary),
+    final user = FirebaseAuth.instance.currentUser;
+
+        return ListenableBuilder(
+      listenable: themeService,
+      builder: (context, _) {
+        final cardBg = themeService.isGlass
+            ? Colors.white.withOpacity(0.7)
+            : AppColors.bgCard;
+        final borderColor = themeService.isGlass
+            ? Colors.black.withOpacity(0.05)
+            : AppColors.borderColor;
+        // Interests card uses a slightly more solid look
+        final interestsCardBg = themeService.isGlass
+            ? Colors.white.withOpacity(0.85)
+            : AppColors.bgCard;
+
+        if (user == null) {
+          return _buildInterestsCard(
+            cardBg: interestsCardBg,
+            borderColor: borderColor,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Text(
+                  "Sign in to see your interests.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.getSecondaryTextColor(),
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          key: ValueKey(_interestsRefreshKey),
+          future: FirebaseFirestore.instance
+              .collection('userPreferences')
+              .doc(user.uid)
+              .get(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return _buildInterestsCard(
+                cardBg: interestsCardBg,
+                borderColor: borderColor,
+                child: const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+              );
+            }
+
+            if (!snapshot.hasData || !snapshot.data!.exists) {
+              return _buildInterestsCard(
+                cardBg: interestsCardBg,
+                borderColor: borderColor,
+                child: _buildInterestsEmptyState(
+                  "You haven't swiped on anything yet. Start swiping to build your profile.",
+                ),
+              );
+            }
+
+            final data = snapshot.data!.data() ?? {};
+            final likedTitles =
+                List<String>.from(data['likedTitles'] ?? const <String>[]);
+            final likedTags =
+                List<String>.from(data['likedTags'] ?? const <String>[]);
+
+            if (likedTitles.isEmpty && likedTags.isEmpty) {
+              return _buildInterestsCard(
+                cardBg: interestsCardBg,
+                borderColor: borderColor,
+                child: _buildInterestsEmptyState(
+                  "You haven't liked any categories yet. Start swiping to build your profile.",
+                ),
+              );
+            }
+
+            return _buildInterestsCard(
+              cardBg: interestsCardBg,
+              borderColor: borderColor,
+              title: "Your Interests",
+              scrollableChild: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (likedTitles.isNotEmpty) ...[
+                    Text(
+                      "Liked categories",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.getSecondaryTextColor(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: likedTitles
+                          .map<Widget>(
+                            (title) => InputChip(
+                              label: Text(
+                                title,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.getTextColor(),
+                                ),
+                              ),
+                              backgroundColor: interestsCardBg,
+                              deleteIcon: Icon(
+                                Icons.cancel,
+                                size: 18,
+                                color: AppColors.getSecondaryTextColor(),
+                              ),
+                              onDeleted: () => _removeLikedTitle(user.uid, title),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                  if (likedTags.isNotEmpty) ...[
+                    Text(
+                      "Liked tags",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.getSecondaryTextColor(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: likedTags
+                          .map<Widget>(
+                            (tag) => InputChip(
+                              label: Text(
+                                tag,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.getTextColor(),
+                                ),
+                              ),
+                              backgroundColor: AppColors.getSecondaryTextColor()
+                                  .withOpacity(0.15),
+                              deleteIcon: Icon(
+                                Icons.cancel,
+                                size: 18,
+                                color: AppColors.getSecondaryTextColor(),
+                              ),
+                              onDeleted: () => _removeLikedTag(user.uid, tag),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildInterestsEmptyState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.favorite_border_rounded,
+              size: 48,
+              color: AppColors.getSecondaryTextColor().withOpacity(0.5),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.getSecondaryTextColor(),
+                fontSize: 15,
+                height: 1.4,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: () {},
-            child: const Text("Reset & Swipe Again"),
+      ),
+    );
+  }
+
+  Widget _buildInterestsCard({
+    required Color cardBg,
+    required Color borderColor,
+    String? title,
+    Widget? scrollableChild,
+    Widget? child,
+  }) {
+    // Interests card: solid, flat look (no glass opacity or heavy shadow)
+    final isGlass = themeService.isGlass;
+    final bg = isGlass
+        ? Colors.white.withOpacity(0.85)
+        : AppColors.bgCard;
+    final border = isGlass
+        ? Colors.black.withOpacity(0.06)
+        : AppColors.borderColor;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isGlass ? 0.04 : 0.08),
+            blurRadius: isGlass ? 12 : 16,
+            offset: const Offset(0, 4),
           ),
-        ),
-      ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (title != null)
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.getTextColor(),
+              ),
+            ),
+          if (title != null) const SizedBox(height: 16),
+          if (scrollableChild != null)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: SingleChildScrollView(
+                child: scrollableChild,
+              ),
+            )
+          else if (child != null)
+            child!,
+        ],
+      ),
     );
   }
 

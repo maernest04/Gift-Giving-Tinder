@@ -5,31 +5,22 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class UnsplashService {
   static String get _accessKey => dotenv.env['UNSPLASH_ACCESS_KEY'] ?? '';
-  static bool get enabled {
-    final raw = (dotenv.env['UNSPLASH_ENABLED'] ?? '').trim().toLowerCase();
-    if (raw.isEmpty) return true;
-    return raw == 'true' || raw == '1' || raw == 'yes' || raw == 'y' || raw == 'on';
-  }
+
+  /// True when UNSPLASH_ACCESS_KEY is set; otherwise uses picsum fallback only.
+  static bool get enabled => _accessKey.isNotEmpty;
 
   /// Fetches a high-quality image URL for a given query.
-  /// Returns a curated Unsplash image URL or a fallback if it fails.
+  /// If no Unsplash key is set, returns a picsum fallback immediately.
   static Future<String> getImageUrl(
     String query, {
     int width = 600,
     int height = 400,
   }) async {
-    if (!enabled) {
-      debugPrint('Unsplash disabled via UNSPLASH_ENABLED=false');
-      return '';
-    }
-
-    // Debug print to see what's happening in the logs
-    debugPrint('Fetching image for: $query');
-
     if (_accessKey.isEmpty) {
-      debugPrint('Unsplash Access Key is empty! Using fallback.');
       return 'https://picsum.photos/seed/${query.hashCode}/$width/$height';
     }
+
+    debugPrint('Fetching image for: $query');
 
     try {
       final response = await http

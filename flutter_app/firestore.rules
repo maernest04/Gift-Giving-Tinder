@@ -1,0 +1,40 @@
+rules_version = '2';
+// Deploy with: firebase deploy --only firestore:rules
+// Partner code lookup requires: any signed-in user can read users and userPreferences.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: anyone signed in can read (needed for partner code lookup).
+    // Only the user can write their own document.
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // User preferences: only owner or linked partner can read (no random lookups).
+    match /userPreferences/{userId} {
+      allow read: if request.auth != null
+        && (request.auth.uid == userId
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.partnerId == userId);
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Swipe events: only the user can create (with their uid); no one needs to read list.
+    match /userSwipes/{docId} {
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if false;
+    }
+
+    // Partner requests: sender creates; both parties can read and delete (accept/decline/cancel).
+    match /partner_requests/{requestId} {
+      allow create: if request.auth != null
+        && request.resource.data.fromUid == request.auth.uid;
+      allow read, delete: if request.auth != null
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      allow update: if false;
+    }
+  }
+}

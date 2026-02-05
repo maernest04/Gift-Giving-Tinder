@@ -9,6 +9,7 @@ import '../services/seed_data_service.dart';
 import '../services/recommendation_engine.dart';
 import '../services/unsplash_service.dart';
 import '../services/adaptive_recommender.dart';
+import '../services/ml_gift_recommender.dart';
 
 class SwipePage extends StatefulWidget {
   const SwipePage({super.key});
@@ -21,6 +22,9 @@ class _SwipePageState extends State<SwipePage>
     with SingleTickerProviderStateMixin {
   // Adaptive recommender ("ML") over the 10-D item vectors.
   late final AdaptiveRecommender _recommender;
+  
+  // Full ML gift recommendation system that learns patterns
+  late final MLGiftRecommender _mlGiftRecommender;
 
   // The pool of unseen items + a 2-card stack (top + next).
   late List<SwipeItem> _allItems;
@@ -28,6 +32,9 @@ class _SwipePageState extends State<SwipePage>
 
   // Track seen items to avoid repetition
   final List<String> _seenIds = [];
+
+  // Avoid flash of empty state before initial cards load
+  bool _initialLoadDone = false;
 
   // Animation State
   late AnimationController _animController;
@@ -43,6 +50,16 @@ class _SwipePageState extends State<SwipePage>
       epsilon: 0.18,
       priorVariance: 0.7,
     );
+    _mlGiftRecommender = MLGiftRecommender(
+      vectorRecommender: _recommender,
+    );
+    
+    // Load historical swipes to learn from past behavior
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _mlGiftRecommender.loadHistoricalData(user.uid);
+    }
+    
     _animController =
         AnimationController(
           vsync: this,
@@ -73,6 +90,7 @@ class _SwipePageState extends State<SwipePage>
     final second = _pickNextFromPool(excludeIds: _seenIds);
     setState(() {
       _cards = second == null ? [first] : [second, first];
+      _initialLoadDone = true;
     });
   }
 
@@ -197,6 +215,9 @@ class _SwipePageState extends State<SwipePage>
 
     // Learn from both likes and dislikes.
     _recommender.update(item.vector, liked: isLiked);
+    
+    // Full ML learning: learn tag patterns, category relationships, and combinations
+    _mlGiftRecommender.learnFromSwipe(item, isLiked);
 
     // Persist the swipe to Firestore for long-term learning / gift suggestions.
     _recordSwipe(item, isLiked);
@@ -221,8 +242,10 @@ class _SwipePageState extends State<SwipePage>
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    final firestore = FirebaseFirestore.instance;
     try {
-      await FirebaseFirestore.instance.collection('userSwipes').add({
+      // Raw swipe events (optional for analytics / replay).
+      await firestore.collection('userSwipes').add({
         'userId': user.uid,
         'itemId': item.id,
         'name': item.name,
@@ -231,8 +254,24 @@ class _SwipePageState extends State<SwipePage>
         'vector': item.vector,
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // Aggregated preferences: titles and tags used for gift recommendations.
+      final prefRef = firestore.collection('userPreferences').doc(user.uid);
+      if (isLiked) {
+        await prefRef.set({
+          'likedTitles': FieldValue.arrayUnion([item.name]),
+          'likedTags': FieldValue.arrayUnion(item.tags),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else {
+        await prefRef.set({
+          'dislikedTitles': FieldValue.arrayUnion([item.name]),
+          'dislikedTags': FieldValue.arrayUnion(item.tags),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
     } catch (_) {
-      // Swallow errors; swipe UX shouldn't break on analytics write failure.
+      // Swallow errors; swipe UX shouldn't break on write failure.
     }
   }
 
@@ -241,6 +280,10 @@ class _SwipePageState extends State<SwipePage>
     return ListenableBuilder(
       listenable: themeService,
       builder: (context, _) {
+        // Avoid flash: show loading until first batch of cards is ready
+        if (!_initialLoadDone && _cards.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
         if (_cards.isEmpty) {
           return _buildEmptyState();
         }
@@ -302,9 +345,12 @@ class _SwipePageState extends State<SwipePage>
               ],
             ),
 
-            // UI Controls
+            // UI Controls (extra bottom padding for home indicator / safe area)
             Padding(
-              padding: const EdgeInsets.only(top: 24, bottom: 20),
+              padding: EdgeInsets.only(
+                top: 24,
+                bottom: 20 + MediaQuery.of(context).padding.bottom,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -546,9 +592,10 @@ class _SwipePageState extends State<SwipePage>
   }
 
   Widget _buildEmptyState() {
+    final bottom = MediaQuery.of(context).padding.bottom;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: EdgeInsets.fromLTRB(32, 32, 32, 32 + bottom),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -569,30 +616,65 @@ class _SwipePageState extends State<SwipePage>
             ),
             const SizedBox(height: 24),
 
-            // Debug Info Display
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "🧠 Model state:",
-                    style: TextStyle(fontWeight: FontWeight.bold),
+            // ML-Narrowed Categories Display
+            FutureBuilder<Map<String, dynamic>>(
+              future: _mlGiftRecommender.getMyRecommendations(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const CircularProgressIndicator();
+                }
+                
+                final data = snapshot.data ?? {};
+                final narrowed = List<String>.from(data['narrowedCategories'] ?? []);
+                final combinations = List<String>.from(data['combinations'] ?? []);
+                
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Seen: ${_seenIds.length} • Remaining: ${_allItems.length}",
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 10,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "🎯 ML-Narrowed Categories:",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      if (narrowed.isNotEmpty) ...[
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: narrowed.take(8).map((cat) => Chip(
+                            label: Text(cat, style: const TextStyle(fontSize: 11)),
+                            padding: EdgeInsets.zero,
+                          )).toList(),
+                        ),
+                      ] else
+                        const Text(
+                          "Keep swiping to learn your preferences!",
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      if (combinations.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                          "💡 Intelligent Combinations:",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                        const SizedBox(height: 4),
+                        ...combinations.take(3).map((combo) => Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            "• $combo",
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                        )),
+                      ],
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
 
             const SizedBox(height: 24),

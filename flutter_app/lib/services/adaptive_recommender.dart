@@ -217,5 +217,25 @@ class AdaptiveRecommender {
     final u2 = _rng.nextDouble();
     return sqrt(-2.0 * log(u1)) * cos(2.0 * pi * u2);
   }
+
+  /// Gets the learned user preference vector (mean of posterior).
+  /// This represents what the model has learned about user preferences.
+  List<double> getLearnedPreferenceVector() {
+    try {
+      final invA = _invert(_A);
+      return _matVec(invA, _b); // mu = A^-1 b
+    } catch (_) {
+      // Fallback if matrix inversion fails
+      return List.filled(d, 0.0);
+    }
+  }
+
+  /// Gets the current model state for persistence/analysis.
+  Map<String, dynamic> getModelState() {
+    return {
+      'preferenceVector': getLearnedPreferenceVector(),
+      'observationCount': _b.length > 0 ? _b.map((x) => x.abs()).reduce((a, b) => a + b).round() : 0,
+    };
+  }
 }
 

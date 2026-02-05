@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'services/theme_service.dart';
 
 class AppColors {
@@ -48,29 +47,31 @@ class AppColors {
 }
 
 class AppTextStyles {
-  static TextStyle get h1 => GoogleFonts.outfit(
+  static TextStyle get h1 => TextStyle(
     fontWeight: FontWeight.w800,
     fontSize: 32,
     color: AppColors.getTextColor(),
     letterSpacing: -0.5,
   );
 
-  static TextStyle get h2 => GoogleFonts.outfit(
+  static TextStyle get h2 => TextStyle(
     fontWeight: FontWeight.w700,
     fontSize: 24,
     color: AppColors.getTextColor(),
   );
 
-  static TextStyle get h3 => GoogleFonts.outfit(
+  static TextStyle get h3 => TextStyle(
     fontWeight: FontWeight.w700,
     fontSize: 20,
     color: AppColors.getTextColor(),
   );
 
-  static TextStyle get body =>
-      GoogleFonts.inter(fontSize: 16, color: AppColors.getTextColor());
+  static TextStyle get body => TextStyle(
+    fontSize: 16,
+    color: AppColors.getTextColor(),
+  );
 
-  static TextStyle get input => GoogleFonts.inter(
+  static TextStyle get input => TextStyle(
     fontSize: 16,
     color: AppColors.getTextColor(),
     fontWeight: FontWeight.w500,

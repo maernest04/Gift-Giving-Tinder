@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import 'swipe_page.dart';
@@ -33,54 +34,74 @@ class _HomePageState extends State<HomePage> {
             ? Colors.black.withOpacity(0.05)
             : AppColors.borderColor;
 
+        final padding = MediaQuery.of(context).padding;
+        // Ensure space for notch/Dynamic Island (top) and home indicator (bottom)
+        // when system doesn't report insets (e.g. web, some simulators)
+        final topInset = math.max(padding.top, 50.0);
+        final bottomInset = math.max(padding.bottom, 10.0);
+
         return AnimatedContainer(
           duration: const Duration(milliseconds: 600),
           curve: Curves.easeInOut,
           color: bgColor,
           child: Scaffold(
             backgroundColor: Colors.transparent,
-            body: SafeArea(child: _pages[_currentIndex]),
-            bottomNavigationBar: AnimatedContainer(
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                color: bgColor,
-                border: Border(
-                  top: BorderSide(color: navBorderColor, width: 1),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(
-                      themeService.isGlass ? 0.05 : 0.2,
-                    ),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
+            body: Padding(
+              padding: EdgeInsets.only(
+                top: topInset,
+                bottom: bottomInset,
+                left: math.max(padding.left, 0.0),
+                right: math.max(padding.right, 0.0),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildNavItem(
-                    icon: Icons.favorite_outline,
-                    activeIcon: Icons.favorite,
-                    label: 'Swipe',
-                    index: 0,
+              child: IndexedStack(
+                index: _currentIndex,
+                children: _pages,
+              ),
+            ),
+            bottomNavigationBar: Padding(
+              padding: EdgeInsets.only(bottom: bottomInset),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  border: Border(
+                    top: BorderSide(color: navBorderColor, width: 1),
                   ),
-                  _buildNavItem(
-                    icon: Icons.people_outline,
-                    activeIcon: Icons.people,
-                    label: 'Partner',
-                    index: 1,
-                  ),
-                  _buildNavItem(
-                    icon: Icons.settings_outlined,
-                    activeIcon: Icons.settings,
-                    label: 'Settings',
-                    index: 2,
-                  ),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(
+                        themeService.isGlass ? 0.05 : 0.2,
+                      ),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildNavItem(
+                      icon: Icons.favorite_outline,
+                      activeIcon: Icons.favorite,
+                      label: 'Swipe',
+                      index: 0,
+                    ),
+                    _buildNavItem(
+                      icon: Icons.people_outline,
+                      activeIcon: Icons.people,
+                      label: 'Partner',
+                      index: 1,
+                    ),
+                    _buildNavItem(
+                      icon: Icons.settings_outlined,
+                      activeIcon: Icons.settings,
+                      label: 'Settings',
+                      index: 2,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

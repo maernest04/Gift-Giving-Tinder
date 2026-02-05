@@ -46,3 +46,9 @@ app.*.map.json
 
 # Environment variables (contains sensitive API keys)
 .env
+
+# Android signing (do not commit key.properties or .jks)
+**/android/key.properties
+
+# Flutter analyze output (optional, regenerate with: flutter analyze > analysis.txt)
+analysis.txt

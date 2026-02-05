@@ -1,16 +1,8 @@
-# flutter_app
+# Gift Giving Tinder – Flutter app
 
-A new Flutter project.
+Flutter app for the Gift Giving Tinder project.
 
-## Getting Started
+- **Setup:** [ENV_SETUP.md](ENV_SETUP.md) – environment variables and Firebase.
+- **Android & iPhone:** [DEPLOYMENT.md](DEPLOYMENT.md) – build and submit to Play Store and App Store.
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Run: `flutter pub get` then `flutter run -d chrome` (or your device).

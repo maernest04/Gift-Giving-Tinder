@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -38,7 +37,7 @@ class _GiftMatchAppState extends State<GiftMatchApp> {
   Future<void> _initializeApp() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // Run initialization and minimum display time in parallel
+    // Run initialization and minimum display time in parallel (no font preload to avoid web DDC conflict)
     await Future.wait([
       _performInitialization(),
       Future.delayed(const Duration(milliseconds: 1500)),
@@ -58,9 +57,6 @@ class _GiftMatchAppState extends State<GiftMatchApp> {
   }
 
   Future<void> _performInitialization() async {
-    // Preload fonts first
-    await GoogleFonts.pendingFonts([GoogleFonts.outfit(), GoogleFonts.inter()]);
-
     // Initialize Theme/Preferences from storage
     await themeService.init();
 
@@ -78,8 +74,6 @@ class _GiftMatchAppState extends State<GiftMatchApp> {
       // Ignore timeout, we'll handle it in build
     }
 
-    // Small delay to ensure fonts are fully rendered
-    await Future.delayed(const Duration(milliseconds: 300));
   }
 
   @override
@@ -119,7 +113,6 @@ class _GiftMatchAppState extends State<GiftMatchApp> {
                 scaffoldBackgroundColor: themeService.isGlass
                     ? AppColors.bgLight
                     : AppColors.bgDark,
-                fontFamily: GoogleFonts.inter().fontFamily,
                 useMaterial3: true,
               ),
               debugShowCheckedModeBanner: false,

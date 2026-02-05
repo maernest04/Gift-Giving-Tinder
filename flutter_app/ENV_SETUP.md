@@ -1,45 +1,29 @@
-# Environment Variables Setup
+# Environment setup
 
-This project uses environment variables to securely store sensitive API keys and configuration.
-
-## Setup Instructions
-
-1. **Copy the example file:**
+1. Copy the example file:
    ```bash
    cp .env.example .env
    ```
 
-2. **Fill in your Firebase credentials** in the `.env` file:
-   - Get these from your Firebase Console: https://console.firebase.google.com/
-   - Project Settings → General → Your apps → Web app
+2. Fill in your **Firebase** values in `.env` (required for web):
+   - [Firebase Console](https://console.firebase.google.com) → your project → **Project settings** → **General** → Your apps → **Web app**.
 
-3. **Never commit the `.env` file:**
-   - The `.env` file is already in `.gitignore`
-   - Only commit `.env.example` as a template
+3. **Optional – Unsplash:** To use Unsplash images on swipe cards, add `UNSPLASH_ACCESS_KEY` from [Unsplash for Developers](https://unsplash.com/developers). If you leave it empty, the app uses a fallback image service.
 
-## Environment Variables
+4. Do **not** commit `.env` (it’s in `.gitignore`).
 
-The following environment variables are required:
+## Variables
 
-- `FIREBASE_API_KEY` - Your Firebase Web API Key
-- `FIREBASE_APP_ID` - Your Firebase App ID
-- `FIREBASE_MESSAGING_SENDER_ID` - Firebase Cloud Messaging Sender ID
-- `FIREBASE_PROJECT_ID` - Your Firebase Project ID
-- `FIREBASE_AUTH_DOMAIN` - Firebase Authentication Domain
-- `FIREBASE_STORAGE_BUCKET` - Firebase Storage Bucket URL
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `FIREBASE_API_KEY` | Yes (web) | Firebase Web API key |
+| `FIREBASE_APP_ID` | Yes (web) | Firebase Web App ID |
+| `FIREBASE_MESSAGING_SENDER_ID` | Yes (web) | Cloud Messaging sender ID |
+| `FIREBASE_PROJECT_ID` | Yes (web) | Firebase project ID |
+| `FIREBASE_AUTH_DOMAIN` | Yes (web) | Auth domain |
+| `FIREBASE_STORAGE_BUCKET` | Yes (web) | Storage bucket URL |
+| `UNSPLASH_ACCESS_KEY` | No | Unsplash API key; omit to use fallback images |
 
-## Security Notes
+## Firestore rules
 
-⚠️ **IMPORTANT:**
-- Never commit the `.env` file to version control
-- Never share your API keys publicly
-- If you accidentally expose your keys, regenerate them immediately in Firebase Console
-- The `.env.example` file should only contain placeholder values
-
-## Troubleshooting
-
-If you get errors about missing environment variables:
-1. Make sure the `.env` file exists in the project root
-2. Verify all required variables are set in `.env`
-3. Run `flutter pub get` to ensure dependencies are installed
-4. Restart your app (hot reload won't reload environment variables)
+Deploy `firestore.rules` so partner codes and preferences work: Firebase Console → Firestore → Rules, or `firebase deploy --only firestore:rules` if using Firebase CLI.

@@ -47,16 +47,8 @@
 </head>
 
 <body>
-  <script>
-    window.addEventListener('load', function (ev) {
-      _flutter.loader.load({
-        config: {
-          // renderer: "html",
-        }
-      });
-    });
-  </script>
-  <script src="flutter_bootstrap.js" async></script>
+  <!-- Load bootstrap without async so it runs after DOM/base href are ready (avoids "could not find a build compatible" error) -->
+  <script src="flutter_bootstrap.js"></script>
 </body>
 
 </html>
