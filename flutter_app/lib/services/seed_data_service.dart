@@ -721,7 +721,7 @@ class SeedDataService {
         imageUrl: 'unsplash:Loungewear Cozy',
         tags: ['Clothing'],
         vector: [0.0, 0.0, 0.6, 0.2, 0.6, 1.0, 0.2, 0.1, 0.3, 0.0],
-      ),R
+      ),
       SwipeItem(
         id: 'clot_pjs',
         name: 'Silk Pajamas',
