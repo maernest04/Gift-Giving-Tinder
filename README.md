@@ -6,10 +6,9 @@ A Flutter app that helps you and a partner to discover gift ideas by swiping on 
 
 ## What it does
 
-- **Swipe** – Browse style, color, brand, hobby, and other interest cards. Swipe right to like, left to pass. Likes are saved and used to personalize suggestions.
-
 ![Swipe screen](assets/swipe.png)
 
+- **Swipe** – Browse style, color, brand, hobby, and other interest cards. Swipe right to like, left to pass. Likes are saved and used to personalize suggestions.
 - **Partner** – Link with someone via a one-time code (friend-request style: send code, they enter it, accept/decline). See their top categories and AI-generated gift combinations, and open searches on Amazon, Target, or Walmart.
 - **Settings** – Account (name, email, password), theme (dark / light), and a deletable list of your liked categories and tags from Firestore.
 

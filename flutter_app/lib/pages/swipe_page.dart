@@ -34,6 +34,14 @@ class _SwipePageState extends State<SwipePage>
   // Track seen items to avoid repetition
   final List<String> _seenIds = [];
 
+  // Track swipes for completion check
+  int _totalSwipes = 0;
+  int _totalLikes = 0;
+  final Set<String> _likedTags = {};
+  final Set<String> _likedCategories = {};
+  bool _hasEnoughData = false;
+  bool _userChoseToContinue = false;
+
   // Avoid flash of empty state before initial cards load
   bool _initialLoadDone = false;
 
@@ -225,6 +233,12 @@ class _SwipePageState extends State<SwipePage>
     setState(() {
       _cards.removeLast();
       _seenIds.add(item.id);
+      _totalSwipes++;
+      if (isLiked) {
+        _totalLikes++;
+        _likedTags.addAll(item.tags);
+        _likedCategories.add(item.name);
+      }
     });
 
     // Learn from both likes and dislikes.
@@ -235,6 +249,13 @@ class _SwipePageState extends State<SwipePage>
 
     // Persist the swipe to Firestore for long-term learning / gift suggestions.
     _recordSwipe(item, isLiked);
+
+    // Check if we have enough data (unless user chose to continue)
+    if (!_userChoseToContinue && _checkIfEnoughData()) {
+      _hasEnoughData = true;
+      _showCompletionDialog();
+      return;
+    }
 
     // Refill the stack back to 2 cards if possible.
     final need = 2 - _cards.length;
@@ -250,6 +271,147 @@ class _SwipePageState extends State<SwipePage>
 
     // Stop when we run out of items.
     if (_cards.isEmpty) return;
+  }
+
+  /// Checks if the ML model has enough data to make good recommendations
+  bool _checkIfEnoughData() {
+    // Need at least 15 likes
+    if (_totalLikes < 15) return false;
+    
+    // Need diversity: at least 5 different tags and 5 different categories
+    if (_likedTags.length < 5 || _likedCategories.length < 5) return false;
+    
+    // Need enough signal: at least 20% like rate (shows engagement)
+    final likeRate = _totalLikes / _totalSwipes;
+    if (likeRate < 0.15) return false; // At least 15% like rate
+    
+    // Check model confidence: if we have enough observations, the model should be confident
+    final modelState = _recommender.getModelState();
+    final observationCount = modelState['observationCount'] as int? ?? 0;
+    if (observationCount < 20) return false; // Need at least 20 observations
+    
+    return true;
+  }
+
+  /// Shows a dialog suggesting the user has provided enough data
+  void _showCompletionDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: themeService.isGlass
+            ? Colors.white.withOpacity(0.95)
+            : AppColors.bgCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: themeService.isGlass
+                ? Colors.black.withOpacity(0.1)
+                : AppColors.borderColor,
+          ),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Great job!',
+                style: TextStyle(
+                  color: AppColors.getTextColor(),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You\'ve swiped on enough items for us to understand your preferences!',
+              style: TextStyle(
+                color: AppColors.getTextColor(),
+                fontSize: 16,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primaryGradient[0].withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.favorite,
+                    color: AppColors.primaryGradient[0],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${_totalLikes} interests • ${_likedTags.length} tags • ${_likedCategories.length} categories',
+                      style: TextStyle(
+                        color: AppColors.getTextColor(),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You can continue swiping if you want, or check out your partner\'s interests!',
+              style: TextStyle(
+                color: AppColors.getSecondaryTextColor(),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              setState(() {
+                _userChoseToContinue = true;
+              });
+            },
+            child: Text(
+              'Keep Swiping',
+              style: TextStyle(
+                color: AppColors.getSecondaryTextColor(),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Optionally navigate to partner page or just dismiss
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGradient[0],
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _recordSwipe(SwipeItem item, bool isLiked) async {
